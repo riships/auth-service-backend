@@ -4,6 +4,7 @@ import { UpdateAuthDto } from './dtos/update-auth.dto';
 import { Role } from './enums/role.enums';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '../../../generated/prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -11,26 +12,28 @@ export class AuthService {
 
   async create(createAuthDto: CreateAuthDto) {
     const email = createAuthDto.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
 
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
 
-    const user: any = {
+    const hashedPassword = await bcrypt.hash(createAuthDto.password, 10);
+    const user: Prisma.UserCreateInput = {
       id: crypto.randomUUID(),
       email,
-      password: createAuthDto.password,
+      password: hashedPassword,
       role: createAuthDto.role ?? Role.STUDENT,
       userId: createAuthDto.userId,
       createdAt: new Date(),
     };
-    
-    user.password = await bcrypt.hash(user.password, 10);
 
-    await this.prisma.user.create({ data: user });
-
-    const { password, ...createdUser } = user;
+    const createdUser = await this.prisma.user.create({
+      data: user,
+      omit: { password: true },
+    });
 
     return {
       message: 'User created successfully!',
@@ -48,6 +51,7 @@ export class AuthService {
   }
 
   update(id: number, updateAuthDto: UpdateAuthDto) {
+    void updateAuthDto;
     return `This action updates a #${id} auth`;
   }
 

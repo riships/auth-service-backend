@@ -1,5 +1,9 @@
 import 'dotenv/config';
-import { BadRequestException, ValidationError, ValidationPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  ValidationError,
+  ValidationPipe,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -22,7 +26,6 @@ function getFirstValidationMessage(errors: ValidationError[]): string {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -35,18 +38,16 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle("NestJS API")
-    .setDescription("API Documentation")
-    .setVersion("1.0")
+    .setTitle('NestJS API')
+    .setDescription('API Documentation')
+    .setVersion('1.0')
     .addBearerAuth()
-    .build()
-
-
+    .build();
 
   const document = SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup("api", app, document);
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+void bootstrap();
