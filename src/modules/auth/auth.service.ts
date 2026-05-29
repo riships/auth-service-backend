@@ -1,61 +1,44 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dtos/create-auth.dto';
-import { UpdateAuthDto } from './dtos/update-auth.dto';
-import { Role } from './enums/role.enums';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { UsersService } from '../users/users.service';
+import { LoginDto } from './dtos/login.dto';
+import { RegisterDto } from './dtos/register.dto';
 import * as bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+  ) {}
 
-  async create(createAuthDto: CreateAuthDto) {
-    const email = createAuthDto.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
+  async register(registerDto: RegisterDto) {
+    // Reuse UsersService's create logic to keep operations DRY and secure
+    return this.usersService.create(registerDto);
+  }
 
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+  async login(loginDto: LoginDto) {
+    const user = await this.usersService.findOneByEmail(loginDto.email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or password');
     }
 
-    const hashedPassword = await bcrypt.hash(createAuthDto.password, 10);
-    const user: Prisma.UserCreateInput = {
-      id: crypto.randomUUID(),
-      email,
-      password: hashedPassword,
-      role: createAuthDto.role ?? Role.STUDENT,
-      userId: createAuthDto.userId,
-      createdAt: new Date(),
-    };
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
 
-    const createdUser = await this.prisma.user.create({
-      data: user,
-      omit: { password: true },
-    });
-
+    const payload = { sub: user.id, email: user.email, role: user.role };
     return {
-      message: 'User created successfully!',
-      status: 201,
-      user: createdUser,
+      access_token: await this.jwtService.signAsync(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
     };
-  }
-
-  findAll() {
-    return { message: 'Hello World!' };
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
-  }
-
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    void updateAuthDto;
-    return `This action updates a #${id} auth`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
   }
 }
